@@ -53,10 +53,12 @@ class UltralyticsDetector(BaseDetector):
     def __init__(self, settings: Settings) -> None:
         from ultralytics import YOLO
 
-        self.model = YOLO(settings.yolo_model)
+        self.model = YOLO(settings.resolved_yolo_model)
+        self.model_device = settings.model_device
         self.confidence_threshold = settings.confidence_threshold
         self.iou_threshold = settings.iou_threshold
         self.tracked_class_names = set(settings.tracked_class_name_list)
+        self.allowed_class_ids = [0] if self.tracked_class_names == {"person"} else None
 
     def detect(self, frame: np.ndarray, frame_index: int) -> list[Detection]:
         results = self.model.predict(
@@ -64,7 +66,8 @@ class UltralyticsDetector(BaseDetector):
             verbose=False,
             conf=self.confidence_threshold,
             iou=self.iou_threshold,
-            device="cpu",
+            device=self.model_device,
+            classes=self.allowed_class_ids,
         )
         detections: list[Detection] = []
         for result in results:

@@ -1,28 +1,28 @@
 # DeepSORT Railway Starter
 
-This project turns your diagram into a deployable starter app:
+This project turns your diagram into a deployable inference app:
 
-- Input: browser camera or local video files
-- ML core: OpenCV preprocessing, YOLO11 person detection, DeepSORT tracking, track state store
+- Input: browser camera, bundled demo videos, or user-uploaded videos
+- ML core: OpenCV preprocessing, YOLO11m person detection, DeepSORT tracking, track state store
 - Server: FastAPI REST + WebSocket streaming
-- Client: React dashboard with live frame, track panel, and stats overlay
+- Client: plain HTML, CSS, and JavaScript served directly by FastAPI
 - Deploy target: Railway using a single Dockerfile
 
 ## Final Goal
 
-The final product is a web app that asks for browser camera access, streams frames to FastAPI, runs YOLO11 person detection plus DeepSORT tracking, and sends annotated frames back with stable person IDs in real time.
+The final product is a web app that asks for browser camera access, streams frames to FastAPI, runs YOLO11m person detection plus DeepSORT tracking, and sends annotated frames back with stable person IDs in real time.
 
 That means the full end-to-end flow is:
 
 1. Request webcam access in the browser
-2. Capture live frames in the React client
+2. Capture live frames in the browser client
 3. Stream those frames to FastAPI over WebSocket
 4. Resize and normalize frames with OpenCV
 5. Detect only `person` objects with YOLO11
 6. Track those detections with DeepSORT using Kalman filtering and Hungarian matching
 7. Store track metadata such as ID, bbox, class, velocity, counts, and FPS
 8. Push annotated JPEG frames plus JSON metadata back to the browser
-9. Keep prerecorded videos in `data/videos/` for demos, debugging, and detector comparison
+9. Allow users to upload an unknown video and run the same detection-and-tracking pipeline on it
 
 ## Project Structure
 
@@ -37,21 +37,14 @@ That means the full end-to-end flow is:
 |       |-- services/encoder.py
 |       |-- services/pipeline.py
 |       |-- services/tracker.py
+|       |-- static/app.js
+|       |-- static/index.html
+|       |-- static/styles.css
 |       `-- main.py
 |-- data/videos/
-|-- frontend/
-|   |-- package.json
-|   |-- vite.config.ts
-|   `-- src/
-|       |-- components/
-|       |-- hooks/useTrackingStream.ts
-|       |-- lib/api.ts
-|       |-- App.tsx
-|       |-- main.tsx
-|       |-- styles.css
-|       `-- types.ts
 |-- .env.example
 |-- Dockerfile
+|-- local.py
 |-- railway.json
 |-- requirements-ml.txt
 `-- requirements.txt
@@ -59,13 +52,13 @@ That means the full end-to-end flow is:
 
 ## What Works Right Now
 
-- FastAPI backend with `/health`, `/api/goal`, `/api/videos`, and `/ws/stream`
+- FastAPI backend with `/health`, `/api/goal`, `/api/videos`, `/api/videos/upload`, and `/ws/stream`
 - Live camera ingestion with `/ws/live-camera`
 - Built-in synthetic source so the app runs even before you upload real videos
-- Real video support from `data/videos/`
+- Real video support from `data/videos/` and uploaded files
 - DeepSORT tracker path is available and configured as the target default
-- YOLO11-compatible Ultralytics detector path is wired in for `person` tracking
-- React dashboard supports both live camera mode and uploaded-video mode
+- YOLO11m-compatible Ultralytics detector path is wired in for `person` tracking
+- Plain HTML/CSS/JS dashboard supports both live camera mode and uploaded-video mode
 - Single-container Railway deployment
 
 ## Local Development
@@ -81,15 +74,13 @@ Copy-Item .env.example .env
 uvicorn backend.app.main:app --reload
 ```
 
-### Frontend
+### All-In-One Local Run
 
 ```powershell
-cd frontend
-npm install
-npm run dev
+python local.py
 ```
 
-Frontend runs on `http://localhost:5173` and proxies to the API at `http://localhost:8000`.
+That starts FastAPI and serves the built-in frontend from the same app on `http://127.0.0.1:8000`.
 
 ## Live Camera Architecture
 
@@ -100,7 +91,7 @@ Important deployment detail:
 - The browser captures frames and sends them to FastAPI over WebSocket.
 - FastAPI runs YOLO11 + DeepSORT and sends the annotated result back.
 
-That is now the architecture implemented in this starter.
+That is now the architecture implemented in this starter, and the local frontend is plain HTML/CSS/JS so no Node build is required.
 
 ## Add Your Own Videos
 
@@ -117,6 +108,8 @@ Supported extensions in this starter:
 - `.mov`
 - `.mkv`
 
+The app also lets a user upload a new video from the browser and then stream that file through the same backend.
+
 ## Railway Deployment
 
 1. Push this repo to GitHub.
@@ -129,10 +122,13 @@ Recommended production env:
 
 ```env
 DETECTOR_BACKEND=ultralytics
-YOLO_MODEL=yolo11n.pt
+YOLO_MODEL=yolo11_model/yolo11m.pt
+MODEL_DEVICE=cpu
 TRACKER_BACKEND=deepsort
 TRACKED_CLASS_NAMES=person
 ```
+
+The Docker image now copies `yolo11_model/` into the container, so the bundled `yolo11m.pt` can be used directly instead of retraining a model.
 
 If Railway startup time becomes too heavy on CPU, temporarily switch `DETECTOR_BACKEND=mock` while you finish the UI and transport layer.
 
@@ -140,11 +136,12 @@ If Railway startup time becomes too heavy on CPU, temporarily switch `DETECTOR_B
 
 Current build direction:
 
-1. YOLO11 for the first real-time version
+1. YOLO11m for the first real-time version
 2. DeepSORT for stable identities
 3. Faster R-CNN later for comparison and benchmarking against YOLO11
 
 ## Notes
 
 - This starter is intentionally structured so detector and tracker backends are swappable.
-- Railway is a good fit for the dashboard and API layer, but sustained CPU-only YOLO11 inference may eventually need a larger instance or a separate GPU-ready inference service.
+- Railway is a good fit for the dashboard and API layer, but sustained CPU-only YOLO11m inference may eventually need a larger instance or a separate GPU-ready inference service.
+- Uploaded videos are stored on the app filesystem, so for long-term production retention you would eventually move those files to object storage.

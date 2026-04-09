@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
+import re
+import shutil
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 
 from backend.app.core.config import get_settings
 from backend.app.models.schemas import HealthPayload
@@ -44,6 +49,37 @@ async def project_goal():
 async def list_videos(request: Request):
     pipeline = request.app.state.pipeline
     return {"sources": [source.model_dump() for source in pipeline.list_sources()]}
+
+
+@router.post("/api/videos/upload")
+async def upload_video(request: Request, file: UploadFile = File(...)):
+    settings = get_settings()
+    pipeline = request.app.state.pipeline
+
+    original_name = file.filename or "upload.mp4"
+    extension = Path(original_name).suffix.lower()
+    if extension not in settings.video_extension_list:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported video format. Allowed extensions: {', '.join(sorted(settings.video_extension_list))}",
+        )
+
+    safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(original_name).stem).strip("-._") or "upload"
+    target_name = f"{safe_stem}-{uuid4().hex[:8]}{extension}"
+    target_path = settings.video_dir / target_name
+    settings.video_dir.mkdir(parents=True, exist_ok=True)
+
+    with target_path.open("wb") as destination:
+        shutil.copyfileobj(file.file, destination)
+
+    await file.close()
+
+    sources = [source.model_dump() for source in pipeline.list_sources()]
+    return {
+        "message": f"Uploaded {target_name}",
+        "source": {"name": target_name, "source_type": "video"},
+        "sources": sources,
+    }
 
 
 @router.websocket("/ws/stream")

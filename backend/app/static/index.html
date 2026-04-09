@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeepSORT Local</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">YOLO11m + DeepSORT</p>
+          <h1>Track people locally with stable IDs from camera or video.</h1>
+          <p class="hero-text">
+            This local interface is plain HTML, CSS, and JavaScript served directly by FastAPI.
+            Open a camera, upload a video, and watch the backend assign person IDs in real time.
+          </p>
+        </div>
+
+        <div class="panel control-panel">
+          <div class="mode-switch" role="tablist" aria-label="Tracking mode">
+            <button id="cameraModeButton" class="mode-chip mode-chip-active" type="button">Live camera</button>
+            <button id="videoModeButton" class="mode-chip" type="button">Video playback</button>
+          </div>
+
+          <label class="field">
+            <span>Camera</span>
+            <select id="cameraFacingSelect">
+              <option value="environment">Rear camera</option>
+              <option value="user">Front camera</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Video source</span>
+            <select id="videoSourceSelect"></select>
+          </label>
+
+          <label id="uploadField" class="field hidden">
+            <span>Upload a new video</span>
+            <input id="videoUploadInput" class="file-input" type="file" accept=".mp4,.avi,.mov,.mkv" />
+          </label>
+
+          <div class="button-row">
+            <button id="startButton" class="button button-primary" type="button">Enable camera tracking</button>
+            <button id="stopButton" class="button button-secondary" type="button">Stop stream</button>
+          </div>
+
+          <p id="modeHint" class="muted">
+            Camera permission is requested in the browser, then frames are streamed to FastAPI for tracking.
+          </p>
+          <p id="feedbackText" class="muted">Loading sources...</p>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <div class="panel frame-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Live view</p>
+              <h2>Annotated output</h2>
+            </div>
+            <span id="statusChip" class="status-chip status-idle">idle</span>
+          </div>
+          <canvas id="frameCanvas" class="video-canvas"></canvas>
+          <div id="emptyState" class="empty-state">Start a stream to see tracked people and their IDs.</div>
+        </div>
+
+        <div class="side-stack">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Stats</p>
+                <h2>Realtime metrics</h2>
+              </div>
+            </div>
+            <div class="stats-grid">
+              <div class="stat">
+                <span>FPS</span>
+                <strong id="fpsValue">--</strong>
+              </div>
+              <div class="stat">
+                <span>Objects</span>
+                <strong id="objectCountValue">--</strong>
+              </div>
+              <div class="stat">
+                <span>Frame</span>
+                <strong id="frameIndexValue">--</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Tracks</p>
+                <h2>Tracked people</h2>
+              </div>
+              <span id="activeCountPill" class="pill">0 active</span>
+            </div>
+            <div id="trackList" class="track-list">
+              <p class="muted">No tracked people yet.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

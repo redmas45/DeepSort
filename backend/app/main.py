@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.api.routes import router
@@ -25,26 +25,12 @@ app.add_middleware(
 app.include_router(router)
 
 
-frontend_dist = settings.frontend_dist_dir
-frontend_index = frontend_dist / "index.html"
-frontend_assets = frontend_dist / "assets"
+static_dir = settings.root_static_dir
+static_index = static_dir / "index.html"
 
-if frontend_assets.exists():
-    app.mount("/assets", StaticFiles(directory=frontend_assets), name="assets")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-if frontend_dist.exists() and frontend_index.exists():
 
-    @app.get("/")
-    async def root():
-        return FileResponse(frontend_index)
-
-else:
-
-    @app.get("/")
-    async def root():
-        return JSONResponse(
-            {
-                "message": "DeepSORT Railway Starter backend is running.",
-                "next_step": "Build the frontend or hit /api/videos and /ws/stream.",
-            }
-        )
+@app.get("/")
+async def root():
+    return FileResponse(static_index)

@@ -19,13 +19,15 @@ class Settings(BaseSettings):
     stream_fps: int = 10
     jpeg_quality: int = 80
     detector_backend: str = "ultralytics"
-    yolo_model: str = "yolo11n.pt"
+    yolo_model: str = "yolo11_model/yolo11m.pt"
+    model_device: str = "cpu"
     confidence_threshold: float = 0.35
     iou_threshold: float = 0.45
     tracker_backend: str = "deepsort"
     max_track_age: int = 30
     match_distance_threshold: float = 120.0
     tracked_class_names: str = "person"
+    allowed_video_extensions: str = ".mp4,.avi,.mov,.mkv"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -39,15 +41,38 @@ class Settings(BaseSettings):
 
     @property
     def video_dir(self) -> Path:
-        return ROOT_DIR / self.video_source_dir
+        configured_path = Path(self.video_source_dir)
+        if configured_path.is_absolute():
+            return configured_path
+        return ROOT_DIR / configured_path
 
     @property
     def frontend_dist_dir(self) -> Path:
         return ROOT_DIR / "frontend" / "dist"
 
     @property
+    def root_static_dir(self) -> Path:
+        return ROOT_DIR / "backend" / "app" / "static"
+
+    @property
     def tracked_class_name_list(self) -> list[str]:
         return [class_name.strip().lower() for class_name in self.tracked_class_names.split(",") if class_name.strip()]
+
+    @property
+    def video_extension_list(self) -> set[str]:
+        return {extension.strip().lower() for extension in self.allowed_video_extensions.split(",") if extension.strip()}
+
+    @property
+    def resolved_yolo_model(self) -> str:
+        configured_path = Path(self.yolo_model)
+        if configured_path.is_absolute():
+            return str(configured_path)
+
+        relative_path = ROOT_DIR / configured_path
+        if relative_path.exists():
+            return str(relative_path)
+
+        return self.yolo_model
 
 
 @lru_cache

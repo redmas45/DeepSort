@@ -100,7 +100,7 @@ class DeepSortTrackerBackend(BaseTracker):
     def __init__(self, settings: Settings) -> None:
         from deep_sort_realtime.deepsort_tracker import DeepSort
 
-        self.tracker = DeepSort(max_age=settings.max_track_age)
+        self.tracker = DeepSort(max_age=settings.max_track_age, embedder_gpu=False)
         self.previous_centers: dict[int, tuple[float, float]] = {}
 
     def update(self, detections: list[Detection], frame: np.ndarray) -> list[TrackedObject]:
