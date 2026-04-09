@@ -34,7 +34,7 @@ export type StreamFrameMessage = {
 };
 
 export type StreamInfoMessage = {
-  event: "end" | "error";
+  event: "ready" | "end" | "error";
   video_name?: string;
   message?: string;
 };

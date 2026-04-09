@@ -18,13 +18,14 @@ class Settings(BaseSettings):
     frame_height: int = 540
     stream_fps: int = 10
     jpeg_quality: int = 80
-    detector_backend: str = "mock"
-    yolo_model: str = "yolov8n.pt"
+    detector_backend: str = "ultralytics"
+    yolo_model: str = "yolo11n.pt"
     confidence_threshold: float = 0.35
     iou_threshold: float = 0.45
-    tracker_backend: str = "simple"
+    tracker_backend: str = "deepsort"
     max_track_age: int = 30
     match_distance_threshold: float = 120.0
+    tracked_class_names: str = "person"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -43,6 +44,10 @@ class Settings(BaseSettings):
     @property
     def frontend_dist_dir(self) -> Path:
         return ROOT_DIR / "frontend" / "dist"
+
+    @property
+    def tracked_class_name_list(self) -> list[str]:
+        return [class_name.strip().lower() for class_name in self.tracked_class_names.split(",") if class_name.strip()]
 
 
 @lru_cache

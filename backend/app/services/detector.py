@@ -56,6 +56,7 @@ class UltralyticsDetector(BaseDetector):
         self.model = YOLO(settings.yolo_model)
         self.confidence_threshold = settings.confidence_threshold
         self.iou_threshold = settings.iou_threshold
+        self.tracked_class_names = set(settings.tracked_class_name_list)
 
     def detect(self, frame: np.ndarray, frame_index: int) -> list[Detection]:
         results = self.model.predict(
@@ -72,11 +73,14 @@ class UltralyticsDetector(BaseDetector):
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 confidence = float(box.conf[0].item())
                 class_id = int(box.cls[0].item())
+                class_name = str(names.get(class_id, class_id))
+                if self.tracked_class_names and class_name.lower() not in self.tracked_class_names:
+                    continue
                 detections.append(
                     Detection(
                         bbox=(x1, y1, x2, y2),
                         confidence=confidence,
-                        class_name=str(names.get(class_id, class_id)),
+                        class_name=class_name,
                         class_id=class_id,
                     )
                 )

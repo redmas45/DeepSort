@@ -38,6 +38,16 @@ def encode_frame_to_base64(frame: np.ndarray, jpeg_quality: int) -> str:
     return base64.b64encode(buffer.tobytes()).decode("utf-8")
 
 
+def decode_frame_from_base64(frame_data: str) -> np.ndarray:
+    encoded_data = frame_data.split(",", 1)[1] if "," in frame_data else frame_data
+    raw_bytes = base64.b64decode(encoded_data)
+    frame_buffer = np.frombuffer(raw_bytes, dtype=np.uint8)
+    frame = cv2.imdecode(frame_buffer, cv2.IMREAD_COLOR)
+    if frame is None:
+        raise ValueError("Unable to decode incoming frame data")
+    return frame
+
+
 def to_track_payloads(tracks: list[tuple[int, tuple[float, float, float, float], str, float, tuple[float, float]]]) -> list[TrackPayload]:
     payloads: list[TrackPayload] = []
     for track_id, bbox, class_name, confidence, velocity in tracks:

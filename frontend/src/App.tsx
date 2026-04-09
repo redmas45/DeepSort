@@ -6,12 +6,16 @@ import { useTrackingStream } from "./hooks/useTrackingStream";
 import { fetchSources } from "./lib/api";
 import type { VideoSource } from "./types";
 
+type TrackingMode = "video" | "camera";
+
 export default function App() {
   const [sources, setSources] = useState<VideoSource[]>([]);
   const [selectedSource, setSelectedSource] = useState<string>("demo://synthetic");
+  const [mode, setMode] = useState<TrackingMode>("camera");
   const [loadingSources, setLoadingSources] = useState(true);
   const [sourceError, setSourceError] = useState("");
-  const { connect, disconnect, frameData, tracks, stats, status, message } = useTrackingStream();
+  const { connectVideo, startCamera, disconnect, frameData, tracks, stats, status, message } =
+    useTrackingStream();
 
   useEffect(() => {
     async function loadSources() {
@@ -36,20 +40,38 @@ export default function App() {
       <section className="hero">
         <div className="hero-copy">
           <p className="eyebrow">DeepSORT + Railway</p>
-          <h1>Track people across video streams with stable IDs and a live dashboard.</h1>
+          <h1>Open the camera, detect people, and keep stable IDs in real time.</h1>
           <p className="hero-text">
-            This starter follows your diagram: input videos, OpenCV preprocessing, detector and tracker
-            adapters, FastAPI streaming, and a React client for frames, tracks, and stats.
+            The final product now matches your goal: browser camera access, YOLO11 person detection,
+            DeepSORT tracking, and a Railway-hosted dashboard that returns annotated live frames, counts,
+            and person IDs. The prerecorded videos stay available for demos and side-by-side evaluation.
           </p>
         </div>
 
         <div className="hero-controls panel">
+          <div className="mode-switch" role="tablist" aria-label="Tracking mode">
+            <button
+              className={`mode-chip ${mode === "camera" ? "mode-chip-active" : ""}`}
+              onClick={() => setMode("camera")}
+              type="button"
+            >
+              Live camera
+            </button>
+            <button
+              className={`mode-chip ${mode === "video" ? "mode-chip-active" : ""}`}
+              onClick={() => setMode("video")}
+              type="button"
+            >
+              Video playback
+            </button>
+          </div>
+
           <label className="field">
-            <span>Video source</span>
+            <span>{mode === "camera" ? "Fallback demo source" : "Video source"}</span>
             <select
               value={selectedSource}
               onChange={(event) => setSelectedSource(event.target.value)}
-              disabled={loadingSources}
+              disabled={loadingSources || mode === "camera"}
             >
               {sources.map((source) => (
                 <option key={source.name} value={source.name}>
@@ -60,14 +82,28 @@ export default function App() {
           </label>
 
           <div className="button-row">
-            <button className="button button-primary" onClick={() => connect(selectedSource)}>
-              Start stream
+            <button
+              className="button button-primary"
+              onClick={() => {
+                if (mode === "camera") {
+                  void startCamera();
+                  return;
+                }
+                connectVideo(selectedSource);
+              }}
+            >
+              {mode === "camera" ? "Enable camera tracking" : "Start video stream"}
             </button>
             <button className="button button-secondary" onClick={disconnect}>
               Stop stream
             </button>
           </div>
 
+          <p className="muted">
+            {mode === "camera"
+              ? "Camera permission is requested in the browser, then frames are streamed to FastAPI for tracking."
+              : "Use your uploaded videos to test the same tracking pipeline without a live camera."}
+          </p>
           {sourceError ? <p className="error-text">{sourceError}</p> : null}
           {loadingSources ? <p className="muted">Loading available sources...</p> : null}
         </div>

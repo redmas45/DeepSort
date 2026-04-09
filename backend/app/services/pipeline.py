@@ -10,8 +10,37 @@ import numpy as np
 from backend.app.core.config import Settings
 from backend.app.models.schemas import StatsPayload, StreamPayload, VideoSourcePayload
 from backend.app.services.detector import build_detector
-from backend.app.services.encoder import annotate_frame, encode_frame_to_base64, to_track_payloads
+from backend.app.services.encoder import (
+    annotate_frame,
+    decode_frame_from_base64,
+    encode_frame_to_base64,
+    to_track_payloads,
+)
 from backend.app.services.tracker import build_tracker
+
+
+class LiveTrackingSession:
+    def __init__(self, settings: Settings, source_name: str = "browser-camera") -> None:
+        self.settings = settings
+        self.source_name = source_name
+        self.detector = build_detector(settings)
+        self.tracker = build_tracker(settings)
+        self.frame_index = 0
+        self.last_tick = time.perf_counter()
+
+    def process_base64_frame(self, frame_data: str, pipeline: "TrackingPipeline") -> dict:
+        frame = decode_frame_from_base64(frame_data)
+        payload = pipeline.build_frame_payload(
+            source_name=self.source_name,
+            frame=frame,
+            frame_index=self.frame_index,
+            detector=self.detector,
+            tracker=self.tracker,
+            last_tick=self.last_tick,
+        )
+        self.frame_index += 1
+        self.last_tick = time.perf_counter()
+        return payload
 
 
 class TrackingPipeline:
@@ -59,7 +88,7 @@ class TrackingPipeline:
                 if not ok:
                     break
 
-                payload = self._build_payload(
+                payload = self.build_frame_payload(
                     source_name=source_path.name,
                     frame=frame,
                     frame_index=frame_index,
@@ -85,7 +114,7 @@ class TrackingPipeline:
 
         while True:
             frame = self._generate_synthetic_frame(frame_index)
-            payload = self._build_payload(
+            payload = self.build_frame_payload(
                 source_name=self.DEMO_SOURCE,
                 frame=frame,
                 frame_index=frame_index,
@@ -99,7 +128,10 @@ class TrackingPipeline:
             frame_index += 1
             await asyncio.sleep(1 / max(self.settings.stream_fps, 1))
 
-    def _build_payload(self, source_name: str, frame: np.ndarray, frame_index: int, detector, tracker, last_tick: float) -> dict:
+    def create_live_session(self, source_name: str = "browser-camera") -> LiveTrackingSession:
+        return LiveTrackingSession(self.settings, source_name=source_name)
+
+    def build_frame_payload(self, source_name: str, frame: np.ndarray, frame_index: int, detector, tracker, last_tick: float) -> dict:
         preprocessed = self._preprocess(frame)
         detections = detector.detect(preprocessed, frame_index)
         tracked = tracker.update(detections, preprocessed)

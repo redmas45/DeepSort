@@ -120,6 +120,27 @@ select {
   gap: 16px;
 }
 
+.mode-switch {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mode-chip {
+  border: 1px solid rgba(135, 163, 235, 0.22);
+  background: rgba(8, 14, 24, 0.76);
+  color: #dbe8ff;
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.mode-chip-active {
+  background: linear-gradient(135deg, rgba(76, 140, 255, 0.22), rgba(60, 233, 189, 0.22));
+  border-color: rgba(115, 181, 255, 0.44);
+  color: #ffffff;
+}
+
 .field {
   display: grid;
   gap: 10px;

@@ -2,26 +2,27 @@
 
 This project turns your diagram into a deployable starter app:
 
-- Input: local video files or a built-in synthetic demo source
-- ML core: OpenCV preprocessing, detector adapter, tracker adapter, track state store
+- Input: browser camera or local video files
+- ML core: OpenCV preprocessing, YOLO11 person detection, DeepSORT tracking, track state store
 - Server: FastAPI REST + WebSocket streaming
 - Client: React dashboard with live frame, track panel, and stats overlay
 - Deploy target: Railway using a single Dockerfile
 
 ## Final Goal
 
-The final product is a web app that reads uploaded videos, runs per-frame detection, keeps stable object IDs across frames, and streams both the annotated image and tracking metadata to a browser in real time.
+The final product is a web app that asks for browser camera access, streams frames to FastAPI, runs YOLO11 person detection plus DeepSORT tracking, and sends annotated frames back with stable person IDs in real time.
 
 That means the full end-to-end flow is:
 
-1. Read 1 to 5 video files from `data/videos/`
-2. Extract frames with OpenCV
-3. Resize and normalize frames
-4. Run object detection
-5. Pass detections into a tracker for persistent IDs
-6. Store track metadata such as ID, bbox, class, velocity, counts, and FPS
-7. Push JPEG frames plus JSON metadata over a FastAPI WebSocket
-8. Render the live result in a React dashboard on Railway
+1. Request webcam access in the browser
+2. Capture live frames in the React client
+3. Stream those frames to FastAPI over WebSocket
+4. Resize and normalize frames with OpenCV
+5. Detect only `person` objects with YOLO11
+6. Track those detections with DeepSORT using Kalman filtering and Hungarian matching
+7. Store track metadata such as ID, bbox, class, velocity, counts, and FPS
+8. Push annotated JPEG frames plus JSON metadata back to the browser
+9. Keep prerecorded videos in `data/videos/` for demos, debugging, and detector comparison
 
 ## Project Structure
 
@@ -52,18 +53,19 @@ That means the full end-to-end flow is:
 |-- .env.example
 |-- Dockerfile
 |-- railway.json
+|-- requirements-ml.txt
 `-- requirements.txt
 ```
 
 ## What Works Right Now
 
 - FastAPI backend with `/health`, `/api/goal`, `/api/videos`, and `/ws/stream`
+- Live camera ingestion with `/ws/live-camera`
 - Built-in synthetic source so the app runs even before you upload real videos
 - Real video support from `data/videos/`
-- Simple persistent-ID tracker that is light enough for Railway
-- Optional DeepSORT adapter if you switch `TRACKER_BACKEND=deepsort`
-- Optional Ultralytics detector if you install `ultralytics` and set `DETECTOR_BACKEND=ultralytics`
-- React dashboard with live canvas, track list, and stats cards
+- DeepSORT tracker path is available and configured as the target default
+- YOLO11-compatible Ultralytics detector path is wired in for `person` tracking
+- React dashboard supports both live camera mode and uploaded-video mode
 - Single-container Railway deployment
 
 ## Local Development
@@ -74,6 +76,7 @@ That means the full end-to-end flow is:
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install -r requirements-ml.txt
 Copy-Item .env.example .env
 uvicorn backend.app.main:app --reload
 ```
@@ -87,6 +90,17 @@ npm run dev
 ```
 
 Frontend runs on `http://localhost:5173` and proxies to the API at `http://localhost:8000`.
+
+## Live Camera Architecture
+
+Important deployment detail:
+
+- Railway cannot directly access a user webcam.
+- The browser must request camera permission with `getUserMedia`.
+- The browser captures frames and sends them to FastAPI over WebSocket.
+- FastAPI runs YOLO11 + DeepSORT and sends the annotated result back.
+
+That is now the architecture implemented in this starter.
 
 ## Add Your Own Videos
 
@@ -111,26 +125,26 @@ Supported extensions in this starter:
 4. Set environment variables from `.env.example`.
 5. Open the generated Railway URL and start the stream.
 
-For a first Railway deployment, keep:
+Recommended production env:
 
 ```env
-DETECTOR_BACKEND=mock
-TRACKER_BACKEND=simple
+DETECTOR_BACKEND=ultralytics
+YOLO_MODEL=yolo11n.pt
+TRACKER_BACKEND=deepsort
+TRACKED_CLASS_NAMES=person
 ```
 
-That keeps startup lighter and avoids downloading heavier ML packages until you are ready.
+If Railway startup time becomes too heavy on CPU, temporarily switch `DETECTOR_BACKEND=mock` while you finish the UI and transport layer.
 
-## Upgrading To Real YOLO + DeepSORT
+## Detector Roadmap
 
-When you want to move from scaffold mode to real ML inference:
+Current build direction:
 
-1. Install `ultralytics` and its runtime dependencies.
-2. Set `DETECTOR_BACKEND=ultralytics`
-3. Set `YOLO_MODEL=yolov8n.pt` or your own weights path
-4. Set `TRACKER_BACKEND=deepsort`
-5. Add real sample videos to `data/videos/`
+1. YOLO11 for the first real-time version
+2. DeepSORT for stable identities
+3. Faster R-CNN later for comparison and benchmarking against YOLO11
 
 ## Notes
 
 - This starter is intentionally structured so detector and tracker backends are swappable.
-- Railway is a good fit for the dashboard and API layer, but heavy YOLO inference may eventually need a larger instance or a separate GPU-ready service.
+- Railway is a good fit for the dashboard and API layer, but sustained CPU-only YOLO11 inference may eventually need a larger instance or a separate GPU-ready inference service.

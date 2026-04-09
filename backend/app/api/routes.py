@@ -23,15 +23,20 @@ async def healthcheck() -> HealthPayload:
 async def project_goal():
     return {
         "goal": (
-            "Stream uploaded videos through a tracking pipeline, detect objects, keep stable IDs "
-            "across frames, and expose frames plus metadata to a live React dashboard."
+            "Open the browser camera, detect people with YOLO11, track them with DeepSORT, and "
+            "return annotated live frames plus stable person IDs to a Railway-hosted dashboard."
         ),
         "pipeline": [
-            "Video source -> OpenCV reader -> frame preprocessing",
-            "Detector adapter -> tracker adapter -> track state store",
+            "Browser camera or uploaded video -> OpenCV preprocessing",
+            "YOLO11 person detection -> DeepSORT tracking",
+            "Kalman filter motion model + Hungarian assignment -> stable track IDs",
             "FastAPI websocket -> JPEG frame encoder -> React dashboard",
         ],
         "deployment_target": "Railway",
+        "important_note": (
+            "Railway cannot directly read a user's webcam. The browser must request camera access, "
+            "capture frames locally, and stream those frames to the backend over WebSocket."
+        ),
     }
 
 
@@ -55,5 +60,44 @@ async def stream_video(websocket: WebSocket, video: str = "demo://synthetic"):
         return
     except Exception as exc:  # pragma: no cover - defensive websocket handling
         await websocket.send_json({"event": "error", "message": f"Unexpected stream error: {exc}"})
+    finally:
+        await websocket.close()
+
+
+@router.websocket("/ws/live-camera")
+async def stream_live_camera(websocket: WebSocket):
+    await websocket.accept()
+    pipeline = websocket.app.state.pipeline
+    live_session = pipeline.create_live_session()
+
+    try:
+        await websocket.send_json(
+            {
+                "event": "ready",
+                "message": "Camera websocket connected. Send JPEG data URLs as frame events.",
+            }
+        )
+
+        while True:
+            payload = await websocket.receive_json()
+            event = payload.get("event")
+
+            if event == "frame":
+                frame_data = payload.get("frame", "")
+                if not frame_data:
+                    await websocket.send_json({"event": "error", "message": "Frame payload is empty."})
+                    continue
+                await websocket.send_json(live_session.process_base64_frame(frame_data, pipeline))
+                continue
+
+            if event == "stop":
+                await websocket.send_json({"event": "end", "video_name": "browser-camera"})
+                break
+
+            await websocket.send_json({"event": "error", "message": f"Unsupported live event: {event}"})
+    except WebSocketDisconnect:
+        return
+    except Exception as exc:  # pragma: no cover - defensive websocket handling
+        await websocket.send_json({"event": "error", "message": f"Unexpected live stream error: {exc}"})
     finally:
         await websocket.close()
