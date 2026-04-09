@@ -17,14 +17,28 @@ class Settings(BaseSettings):
     frame_width: int = 960
     frame_height: int = 540
     stream_fps: int = 10
-    jpeg_quality: int = 80
+    jpeg_quality: int = 82
+    camera_capture_fps: int = 4
+    camera_max_width: int = 960
+    camera_jpeg_quality: float = 0.85
     detector_backend: str = "ultralytics"
     yolo_model: str = "yolo11_model/yolo11m.pt"
     model_device: str = "cpu"
     confidence_threshold: float = 0.35
     iou_threshold: float = 0.45
+    min_detection_area: int = 2500
+    min_detection_height: int = 60
+    max_detection_width_height_ratio: float = 1.35
     tracker_backend: str = "deepsort"
     max_track_age: int = 30
+    tracker_n_init: int = 3
+    tracker_max_iou_distance: float = 0.7
+    tracker_max_cosine_distance: float = 0.2
+    tracker_nn_budget: int = 100
+    tracker_embedder: str = "mobilenet"
+    tracker_embedder_model_name: str = ""
+    tracker_embedder_weights: str = ""
+    tracker_use_half: bool = False
     match_distance_threshold: float = 120.0
     tracked_class_names: str = "person"
     allowed_video_extensions: str = ".mp4,.avi,.mov,.mkv"
@@ -73,6 +87,21 @@ class Settings(BaseSettings):
             return str(relative_path)
 
         return self.yolo_model
+
+    @property
+    def resolved_tracker_embedder_weights(self) -> str | None:
+        if not self.tracker_embedder_weights:
+            return None
+
+        configured_path = Path(self.tracker_embedder_weights)
+        if configured_path.is_absolute():
+            return str(configured_path)
+
+        relative_path = ROOT_DIR / configured_path
+        if relative_path.exists():
+            return str(relative_path)
+
+        return self.tracker_embedder_weights
 
 
 @lru_cache

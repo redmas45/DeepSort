@@ -21,6 +21,13 @@ class StatsPayload(BaseModel):
     fps: float
     object_count: int
     active_track_ids: list[int]
+    raw_detection_count: int = 0
+    filtered_detection_count: int = 0
+    total_unique_tracks: int = 0
+    processing_ms: float = 0.0
+    detection_ms: float = 0.0
+    tracking_ms: float = 0.0
+    encode_ms: float = 0.0
 
 
 class StreamPayload(BaseModel):

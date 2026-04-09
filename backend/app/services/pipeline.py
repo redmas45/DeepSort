@@ -132,9 +132,16 @@ class TrackingPipeline:
         return LiveTrackingSession(self.settings, source_name=source_name)
 
     def build_frame_payload(self, source_name: str, frame: np.ndarray, frame_index: int, detector, tracker, last_tick: float) -> dict:
+        pipeline_start = time.perf_counter()
         preprocessed = self._preprocess(frame)
+        detection_start = time.perf_counter()
         detections = detector.detect(preprocessed, frame_index)
+        detection_end = time.perf_counter()
+
+        tracking_start = time.perf_counter()
         tracked = tracker.update(detections, preprocessed)
+        tracking_end = time.perf_counter()
+
         tracks = to_track_payloads(
             [
                 (track.track_id, track.bbox, track.class_name, track.confidence, track.velocity_px)
@@ -142,14 +149,25 @@ class TrackingPipeline:
             ]
         )
         annotated = annotate_frame(preprocessed, tracks)
+        encode_start = time.perf_counter()
         encoded_frame = encode_frame_to_base64(annotated, self.settings.jpeg_quality)
+        encode_end = time.perf_counter()
         now = time.perf_counter()
         fps = 1.0 / max(now - last_tick, 1e-6)
+        detector_metrics = detector.get_runtime_metrics()
+        tracker_metrics = tracker.get_runtime_metrics()
         stats = StatsPayload(
             frame_index=frame_index,
             fps=round(fps, 2),
             object_count=len(tracks),
             active_track_ids=[track.track_id for track in tracks],
+            raw_detection_count=int(detector_metrics.get("raw_detection_count", len(detections))),
+            filtered_detection_count=int(detector_metrics.get("filtered_detection_count", len(detections))),
+            total_unique_tracks=int(tracker_metrics.get("total_unique_tracks", len(tracks))),
+            processing_ms=round((encode_end - pipeline_start) * 1000, 2),
+            detection_ms=round((detection_end - detection_start) * 1000, 2),
+            tracking_ms=round((tracking_end - tracking_start) * 1000, 2),
+            encode_ms=round((encode_end - encode_start) * 1000, 2),
         )
 
         payload = StreamPayload(

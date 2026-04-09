@@ -26,6 +26,9 @@ class BaseTracker:
     def update(self, detections: list[Detection], frame: np.ndarray) -> list[TrackedObject]:
         raise NotImplementedError
 
+    def get_runtime_metrics(self) -> dict[str, int]:
+        return {"total_unique_tracks": 0}
+
 
 class SimpleTrackerBackend(BaseTracker):
     """A lightweight ID persistence tracker that is cheap to run on Railway."""
@@ -95,13 +98,28 @@ class SimpleTrackerBackend(BaseTracker):
         x1, y1, x2, y2 = bbox
         return ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
 
+    def get_runtime_metrics(self) -> dict[str, int]:
+        return {"total_unique_tracks": max(self.next_track_id - 1, 0)}
+
 
 class DeepSortTrackerBackend(BaseTracker):
     def __init__(self, settings: Settings) -> None:
         from deep_sort_realtime.deepsort_tracker import DeepSort
 
-        self.tracker = DeepSort(max_age=settings.max_track_age, embedder_gpu=False)
+        self.tracker = DeepSort(
+            max_age=settings.max_track_age,
+            n_init=settings.tracker_n_init,
+            max_iou_distance=settings.tracker_max_iou_distance,
+            max_cosine_distance=settings.tracker_max_cosine_distance,
+            nn_budget=settings.tracker_nn_budget,
+            embedder=settings.tracker_embedder,
+            embedder_model_name=settings.tracker_embedder_model_name or None,
+            embedder_wts=settings.resolved_tracker_embedder_weights,
+            half=settings.tracker_use_half,
+            embedder_gpu=False,
+        )
         self.previous_centers: dict[int, tuple[float, float]] = {}
+        self.seen_track_ids: set[int] = set()
 
     def update(self, detections: list[Detection], frame: np.ndarray) -> list[TrackedObject]:
         bounding_boxes = []
@@ -115,6 +133,7 @@ class DeepSortTrackerBackend(BaseTracker):
                 continue
 
             track_id = int(track.track_id)
+            self.seen_track_ids.add(track_id)
             x1, y1, x2, y2 = track.to_ltrb()
             center = ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
             previous_center = self.previous_centers.get(track_id, center)
@@ -130,6 +149,9 @@ class DeepSortTrackerBackend(BaseTracker):
                 )
             )
         return results
+
+    def get_runtime_metrics(self) -> dict[str, int]:
+        return {"total_unique_tracks": len(self.seen_track_ids)}
 
 
 def build_tracker(settings: Settings) -> BaseTracker:

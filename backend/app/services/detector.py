@@ -23,9 +23,19 @@ class BaseDetector:
     def detect(self, frame: np.ndarray, frame_index: int) -> list[Detection]:
         raise NotImplementedError
 
+    def get_runtime_metrics(self) -> dict[str, int]:
+        return {
+            "raw_detection_count": 0,
+            "filtered_detection_count": 0,
+        }
+
 
 class MockDetector(BaseDetector):
     """Generates deterministic moving boxes so the UI can be tested anywhere."""
+
+    def __init__(self) -> None:
+        self.last_raw_detection_count = 0
+        self.last_filtered_detection_count = 0
 
     def detect(self, frame: np.ndarray, frame_index: int) -> list[Detection]:
         height, width = frame.shape[:2]
@@ -46,7 +56,15 @@ class MockDetector(BaseDetector):
                     class_id=0,
                 )
             )
+        self.last_raw_detection_count = len(detections)
+        self.last_filtered_detection_count = len(detections)
         return detections
+
+    def get_runtime_metrics(self) -> dict[str, int]:
+        return {
+            "raw_detection_count": self.last_raw_detection_count,
+            "filtered_detection_count": self.last_filtered_detection_count,
+        }
 
 
 class UltralyticsDetector(BaseDetector):
@@ -59,6 +77,11 @@ class UltralyticsDetector(BaseDetector):
         self.iou_threshold = settings.iou_threshold
         self.tracked_class_names = set(settings.tracked_class_name_list)
         self.allowed_class_ids = [0] if self.tracked_class_names == {"person"} else None
+        self.min_detection_area = settings.min_detection_area
+        self.min_detection_height = settings.min_detection_height
+        self.max_detection_width_height_ratio = settings.max_detection_width_height_ratio
+        self.last_raw_detection_count = 0
+        self.last_filtered_detection_count = 0
 
     def detect(self, frame: np.ndarray, frame_index: int) -> list[Detection]:
         results = self.model.predict(
@@ -70,14 +93,18 @@ class UltralyticsDetector(BaseDetector):
             classes=self.allowed_class_ids,
         )
         detections: list[Detection] = []
+        raw_detection_count = 0
         for result in results:
             names = result.names
             for box in result.boxes:
+                raw_detection_count += 1
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 confidence = float(box.conf[0].item())
                 class_id = int(box.cls[0].item())
                 class_name = str(names.get(class_id, class_id))
                 if self.tracked_class_names and class_name.lower() not in self.tracked_class_names:
+                    continue
+                if not self._passes_bbox_filters(x1, y1, x2, y2):
                     continue
                 detections.append(
                     Detection(
@@ -87,7 +114,29 @@ class UltralyticsDetector(BaseDetector):
                         class_id=class_id,
                     )
                 )
+        self.last_raw_detection_count = raw_detection_count
+        self.last_filtered_detection_count = len(detections)
         return detections
+
+    def get_runtime_metrics(self) -> dict[str, int]:
+        return {
+            "raw_detection_count": self.last_raw_detection_count,
+            "filtered_detection_count": self.last_filtered_detection_count,
+        }
+
+    def _passes_bbox_filters(self, x1: float, y1: float, x2: float, y2: float) -> bool:
+        width = max(x2 - x1, 0.0)
+        height = max(y2 - y1, 0.0)
+        area = width * height
+        if area < self.min_detection_area:
+            return False
+        if height < self.min_detection_height:
+            return False
+        if height <= 0:
+            return False
+        if width / height > self.max_detection_width_height_ratio:
+            return False
+        return True
 
 
 def build_detector(settings: Settings) -> BaseDetector:

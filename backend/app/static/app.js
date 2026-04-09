@@ -8,6 +8,11 @@
     captureContext: null,
     captureTimer: null,
     awaitingFrame: false,
+    clientConfig: {
+      camera_capture_fps: 4,
+      camera_max_width: 960,
+      camera_jpeg_quality: 0.85,
+    },
   };
 
   const cameraModeButton = document.getElementById("cameraModeButton");
@@ -26,6 +31,12 @@
   const fpsValue = document.getElementById("fpsValue");
   const objectCountValue = document.getElementById("objectCountValue");
   const frameIndexValue = document.getElementById("frameIndexValue");
+  const rawDetectionValue = document.getElementById("rawDetectionValue");
+  const filteredDetectionValue = document.getElementById("filteredDetectionValue");
+  const latencyValue = document.getElementById("latencyValue");
+  const totalTrackValue = document.getElementById("totalTrackValue");
+  const detectionLatencyValue = document.getElementById("detectionLatencyValue");
+  const trackingLatencyValue = document.getElementById("trackingLatencyValue");
   const activeCountPill = document.getElementById("activeCountPill");
   const trackList = document.getElementById("trackList");
   const frameContext = frameCanvas.getContext("2d");
@@ -81,6 +92,12 @@
     fpsValue.textContent = stats ? String(stats.fps) : "--";
     objectCountValue.textContent = stats ? String(stats.object_count) : "--";
     frameIndexValue.textContent = stats ? String(stats.frame_index) : "--";
+    rawDetectionValue.textContent = stats ? String(stats.raw_detection_count) : "--";
+    filteredDetectionValue.textContent = stats ? String(stats.filtered_detection_count) : "--";
+    latencyValue.textContent = stats ? String(stats.processing_ms) : "--";
+    totalTrackValue.textContent = stats ? String(stats.total_unique_tracks) : "--";
+    detectionLatencyValue.textContent = stats ? String(stats.detection_ms) : "--";
+    trackingLatencyValue.textContent = stats ? String(stats.tracking_ms) : "--";
   }
 
   function renderFrame(base64Frame) {
@@ -179,6 +196,7 @@
   function startCameraPump(socket) {
     state.captureCanvas = document.createElement("canvas");
     state.captureContext = state.captureCanvas.getContext("2d");
+    const captureIntervalMs = Math.round(1000 / Math.max(state.clientConfig.camera_capture_fps || 4, 1));
 
     state.captureTimer = window.setInterval(() => {
       if (!state.captureVideo || !state.captureContext) {
@@ -191,9 +209,11 @@
         return;
       }
 
-      const scale = Math.min(1, 960 / state.captureVideo.videoWidth);
+      const scale = Math.min(1, (state.clientConfig.camera_max_width || 960) / state.captureVideo.videoWidth);
       state.captureCanvas.width = Math.round(state.captureVideo.videoWidth * scale);
       state.captureCanvas.height = Math.round(state.captureVideo.videoHeight * scale);
+      state.captureContext.imageSmoothingEnabled = true;
+      state.captureContext.imageSmoothingQuality = "high";
       state.captureContext.drawImage(
         state.captureVideo,
         0,
@@ -206,10 +226,26 @@
       socket.send(
         JSON.stringify({
           event: "frame",
-          frame: state.captureCanvas.toDataURL("image/jpeg", 0.72),
+          frame: state.captureCanvas.toDataURL("image/jpeg", state.clientConfig.camera_jpeg_quality || 0.85),
         }),
       );
-    }, 200);
+    }, captureIntervalMs);
+  }
+
+  async function fetchClientConfig() {
+    try {
+      const response = await fetch("/api/client-config");
+      if (!response.ok) {
+        throw new Error("Unable to load client config.");
+      }
+      const data = await response.json();
+      state.clientConfig = {
+        ...state.clientConfig,
+        ...data,
+      };
+    } catch (error) {
+      setStatus("error", error instanceof Error ? error.message : "Unable to load client config.");
+    }
   }
 
   async function fetchSources() {
@@ -345,5 +381,5 @@
   window.addEventListener("beforeunload", disconnect);
 
   setMode("camera");
-  fetchSources();
+  Promise.all([fetchClientConfig(), fetchSources()]).catch(() => {});
 })();

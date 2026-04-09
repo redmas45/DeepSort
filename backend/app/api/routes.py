@@ -51,6 +51,18 @@ async def list_videos(request: Request):
     return {"sources": [source.model_dump() for source in pipeline.list_sources()]}
 
 
+@router.get("/api/client-config")
+async def client_config():
+    settings = get_settings()
+    return {
+        "camera_capture_fps": settings.camera_capture_fps,
+        "camera_max_width": settings.camera_max_width,
+        "camera_jpeg_quality": settings.camera_jpeg_quality,
+        "frame_width": settings.frame_width,
+        "frame_height": settings.frame_height,
+    }
+
+
 @router.post("/api/videos/upload")
 async def upload_video(request: Request, file: UploadFile = File(...)):
     settings = get_settings()
