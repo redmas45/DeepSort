@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     video_source_dir: str = "data/videos"
     frame_width: int = 960
     frame_height: int = 540
-    stream_fps: int = 24
-    camera_capture_fps: int = 15
+    stream_fps: int = 10
+    camera_capture_fps: int = 4
     camera_max_width: int = 960
     camera_jpeg_quality: float = 0.85
     jpeg_quality: int = 82
@@ -29,9 +29,9 @@ class Settings(BaseSettings):
     iou_threshold: float = 0.45
     
     # --- ADDED: DETECTOR FILTERS ---
-    min_detection_area: int = 15000
-    min_detection_height: int = 150
-    max_detection_width_height_ratio: float = 2.0
+    min_detection_area: int = 8000
+    min_detection_height: int = 120
+    max_detection_width_height_ratio: float = 1.2
 
     tracker_backend: str = "deepsort"
     max_track_age: int = 30
