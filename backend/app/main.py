@@ -11,8 +11,6 @@ from backend.app.services.pipeline import TrackingPipeline
 
 
 settings = get_settings()
-print("RAW:", raw_detection_count)
-print("AFTER FILTER:", len(detections))
 app = FastAPI(title=settings.app_name)
 app.state.pipeline = TrackingPipeline(settings)
 
