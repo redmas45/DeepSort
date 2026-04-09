@@ -24,7 +24,6 @@ RUN pip install -r requirements.txt \
     && pip install -r requirements-ml.txt
 
 COPY backend ./backend
-COPY data ./data
 COPY yolo11_model ./yolo11_model
 
 CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
