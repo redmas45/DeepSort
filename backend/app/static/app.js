@@ -9,7 +9,7 @@
     captureTimer: null,
     awaitingFrame: false,
     clientConfig: {
-      camera_capture_fps: 4,
+      camera_capture_fps: 15,
       camera_max_width: 960,
       camera_jpeg_quality: 0.85,
     },
