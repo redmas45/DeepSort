@@ -16,12 +16,12 @@ class Settings(BaseSettings):
     video_source_dir: str = "data/videos"
     frame_width: int = 960
     frame_height: int = 540
-    stream_fps: int = 24
+    stream_fps: int = 10
     jpeg_quality: int = 80
     detector_backend: str = "ultralytics"
     yolo_model: str = "yolo11_model/yolo11m.pt"
     model_device: str = "cpu"
-    confidence_threshold: float = 0.7
+    confidence_threshold: float = 0.6
     iou_threshold: float = 0.45
     tracker_backend: str = "deepsort"
     max_track_age: int = 30
