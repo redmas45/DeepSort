@@ -31,8 +31,6 @@ class BaseDetector:
 
 
 class MockDetector(BaseDetector):
-    """Generates deterministic moving boxes so the UI can be tested anywhere."""
-
     def __init__(self) -> None:
         self.last_raw_detection_count = 0
         self.last_filtered_detection_count = 0
@@ -56,6 +54,7 @@ class MockDetector(BaseDetector):
                     class_id=0,
                 )
             )
+
         self.last_raw_detection_count = len(detections)
         self.last_filtered_detection_count = len(detections)
         return detections
@@ -92,20 +91,26 @@ class UltralyticsDetector(BaseDetector):
             device=self.model_device,
             classes=self.allowed_class_ids,
         )
+
         detections: list[Detection] = []
         raw_detection_count = 0
+
         for result in results:
             names = result.names
             for box in result.boxes:
                 raw_detection_count += 1
+
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 confidence = float(box.conf[0].item())
                 class_id = int(box.cls[0].item())
                 class_name = str(names.get(class_id, class_id))
+
                 if self.tracked_class_names and class_name.lower() not in self.tracked_class_names:
                     continue
+
                 if not self._passes_bbox_filters(x1, y1, x2, y2):
                     continue
+
                 detections.append(
                     Detection(
                         bbox=(x1, y1, x2, y2),
@@ -114,20 +119,20 @@ class UltralyticsDetector(BaseDetector):
                         class_id=class_id,
                     )
                 )
+
+        # 🔥 NEW: REMOVE DUPLICATE OVERLAPPING DETECTIONS
+        detections = self._remove_duplicate_detections(detections)
+
         self.last_raw_detection_count = raw_detection_count
         self.last_filtered_detection_count = len(detections)
-        return detections
 
-    def get_runtime_metrics(self) -> dict[str, int]:
-        return {
-            "raw_detection_count": self.last_raw_detection_count,
-            "filtered_detection_count": self.last_filtered_detection_count,
-        }
+        return detections
 
     def _passes_bbox_filters(self, x1: float, y1: float, x2: float, y2: float) -> bool:
         width = max(x2 - x1, 0.0)
         height = max(y2 - y1, 0.0)
         area = width * height
+
         if area < self.min_detection_area:
             return False
         if height < self.min_detection_height:
@@ -136,7 +141,55 @@ class UltralyticsDetector(BaseDetector):
             return False
         if width / height > self.max_detection_width_height_ratio:
             return False
+
         return True
+
+    # 🔥 CORE FIX FUNCTION
+    def _remove_duplicate_detections(self, detections: list[Detection]) -> list[Detection]:
+        if not detections:
+            return detections
+
+        filtered = []
+
+        for i, det1 in enumerate(detections):
+            x1, y1, x2, y2 = det1.bbox
+            area1 = (x2 - x1) * (y2 - y1)
+
+            keep = True
+
+            for j, det2 in enumerate(detections):
+                if i == j:
+                    continue
+
+                xx1, yy1, xx2, yy2 = det2.bbox
+                area2 = (xx2 - xx1) * (yy2 - yy1)
+
+                # Compute IoU
+                inter_x1 = max(x1, xx1)
+                inter_y1 = max(y1, yy1)
+                inter_x2 = min(x2, xx2)
+                inter_y2 = min(y2, yy2)
+
+                inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
+                union_area = area1 + area2 - inter_area
+
+                iou = inter_area / union_area if union_area > 0 else 0
+
+                # Remove weaker overlapping box
+                if iou > 0.5 and det1.confidence < det2.confidence:
+                    keep = False
+                    break
+
+            if keep:
+                filtered.append(det1)
+
+        return filtered
+
+    def get_runtime_metrics(self) -> dict[str, int]:
+        return {
+            "raw_detection_count": self.last_raw_detection_count,
+            "filtered_detection_count": self.last_filtered_detection_count,
+        }
 
 
 def build_detector(settings: Settings) -> BaseDetector:
@@ -145,7 +198,7 @@ def build_detector(settings: Settings) -> BaseDetector:
 
     try:
         return UltralyticsDetector(settings)
-    except Exception as exc:  # pragma: no cover - runtime dependency fallback
+    except Exception as exc:
         logger.warning(
             "Ultralytics detector unavailable, falling back to mock detector: %s",
             exc,

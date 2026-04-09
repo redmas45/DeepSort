@@ -4,6 +4,7 @@ import argparse
 import threading
 import webbrowser
 
+from ultralytics import settings
 import uvicorn
 
 from backend.app.core.config import get_settings
@@ -29,6 +30,8 @@ def open_browser(url: str) -> None:
 def main() -> None:
     args = parse_args()
     settings = get_settings()
+    # print("DEBUG - Cosine Distance:", settings.tracker_max_cosine_distance)
+    # print("DEBUG - Min Area:", settings.min_detection_area)
     settings.video_dir.mkdir(parents=True, exist_ok=True)
 
     url = f"http://{args.host}:{args.port}"

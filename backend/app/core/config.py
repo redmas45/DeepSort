@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,15 +17,35 @@ class Settings(BaseSettings):
     video_source_dir: str = "data/videos"
     frame_width: int = 960
     frame_height: int = 540
-    stream_fps: int = 10
-    jpeg_quality: int = 80
+    stream_fps: int = 24
+    camera_capture_fps: int = 15
+    camera_max_width: int = 960
+    camera_jpeg_quality: float = 0.85
+    jpeg_quality: int = 82
     detector_backend: str = "ultralytics"
     yolo_model: str = "yolo11_model/yolo11m.pt"
     model_device: str = "cpu"
     confidence_threshold: float = 0.6
     iou_threshold: float = 0.45
+    
+    # --- ADDED: DETECTOR FILTERS ---
+    min_detection_area: int = 15000
+    min_detection_height: int = 150
+    max_detection_width_height_ratio: float = 2.0
+
     tracker_backend: str = "deepsort"
     max_track_age: int = 30
+    
+    # --- ADDED: DEEPSORT TRACKER SETTINGS ---
+    tracker_n_init: int = 3
+    tracker_max_iou_distance: float = 0.7
+    tracker_max_cosine_distance: float = 0.2
+    tracker_nn_budget: int = 100
+    tracker_embedder: str = "mobilenet"
+    tracker_embedder_model_name: Optional[str] = None
+    tracker_embedder_weights: Optional[str] = None
+    tracker_use_half: bool = False
+
     match_distance_threshold: float = 120.0
     tracked_class_names: str = "person"
     allowed_video_extensions: str = ".mp4,.avi,.mov,.mkv"
