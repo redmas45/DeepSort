@@ -176,7 +176,7 @@ class UltralyticsDetector(BaseDetector):
                 iou = inter_area / union_area if union_area > 0 else 0
 
                 # Remove weaker overlapping box
-                if iou > 0.5 and det1.confidence < det2.confidence:
+                if iou > 0.7 and det1.confidence < det2.confidence:
                     keep = False
                     break
 

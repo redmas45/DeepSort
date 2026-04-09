@@ -29,9 +29,9 @@ class Settings(BaseSettings):
     iou_threshold: float = 0.45
     
     # --- ADDED: DETECTOR FILTERS ---
-    min_detection_area: int = 8000
-    min_detection_height: int = 120
-    max_detection_width_height_ratio: float = 1.2
+    min_detection_area: int = 2000
+    min_detection_height: int = 80
+    max_detection_width_height_ratio: float = 1.5
 
     tracker_backend: str = "deepsort"
     max_track_age: int = 30
