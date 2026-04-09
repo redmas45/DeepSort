@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     detector_backend: str = "ultralytics"
     yolo_model: str = "yolo11_model/yolo11m.pt"
     model_device: str = "cpu"
-    confidence_threshold: float = 0.5
+    confidence_threshold: float = 0.7
     iou_threshold: float = 0.45
     tracker_backend: str = "deepsort"
     max_track_age: int = 30
