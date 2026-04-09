@@ -205,3 +205,9 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# DeepSORT project artifacts
+frontend/node_modules/
+frontend/dist/
+data/videos/*
+!data/videos/.gitkeep
